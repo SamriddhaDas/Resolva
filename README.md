@@ -1,4 +1,4 @@
-# Resolva — Complaint Management System (v2)
+# Resolva — Complaint Management System
 
 A modern rewrite of a classic PHP/MySQL complaint system using a focused, polyglot stack:
 
