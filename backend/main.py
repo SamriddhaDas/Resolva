@@ -27,9 +27,9 @@ from pydantic import BaseModel, EmailStr, Field
 # Config
 # --------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "complaints.db"
+DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "complaints.db")))
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
-CLASSIFIER_BIN = BASE_DIR.parent / "native" / "classifier"
+CLASSIFIER_BIN = Path(os.getenv("CLASSIFIER_BIN", str(BASE_DIR.parent / "native" / "classifier")))
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-please-1234567890")
 ALGO = "HS256"
 TOKEN_TTL_HOURS = 24
@@ -183,12 +183,18 @@ class StatusIn(BaseModel):
 # App
 # --------------------------------------------------------------------------
 app = FastAPI(title="Complaint Management System", version="2.0.0")
+_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/health")
+def _health():
+    return {"status": "ok"}
 
 
 @app.on_event("startup")
