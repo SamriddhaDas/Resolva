@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.db
+backend/data/
+native/classifier
+node_modules/
+.env
+.DS_Store

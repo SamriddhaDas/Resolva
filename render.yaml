@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: resolva-api
+    env: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "https://your-app.vercel.app"
+    disk:
+      name: resolva-data
+      mountPath: /app/backend/data
+      sizeGB: 1
