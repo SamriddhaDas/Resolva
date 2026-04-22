@@ -1,22 +1,31 @@
 // Tiny fetch wrapper. Adds JWT and parses JSON errors uniformly.
-// Configure backend URL by setting window.RESOLVA_API_BASE in config.js
-// or leave blank to call same-origin (useful for local dev with the Node proxy).
 window.api = (() => {
-  const BASE = (window.RESOLVA_API_BASE || '').replace(/\/$/, '');
+  function base() {
+    return ((window.RESOLVA_API_BASE || '') + '').replace(/\/$/, '');
+  }
   function token() { return localStorage.getItem('resolva_token'); }
   function url(path) {
     if (/^https?:\/\//.test(path)) return path;
-    return BASE + path;
+    return base() + path;
   }
   async function request(method, path, body) {
-    const res = await fetch(url(path), {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token() ? { 'Authorization': 'Bearer ' + token() } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const target = url(path);
+    if (!base() && !/^https?:\/\//.test(path)) {
+      throw new Error("Backend URL not set. Open js/config.js and set RESOLVA_API_BASE to your Render URL.");
+    }
+    let res;
+    try {
+      res = await fetch(target, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token() ? { 'Authorization': 'Bearer ' + token() } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (netErr) {
+      throw new Error("Cannot reach backend at " + target + ". (Server may be sleeping — wait 30s and retry.)");
+    }
     const ct = res.headers.get('content-type') || '';
     const data = ct.includes('json') ? await res.json().catch(() => ({})) : await res.text();
     if (!res.ok) {
