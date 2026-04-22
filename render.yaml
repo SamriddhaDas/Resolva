@@ -5,11 +5,17 @@ services:
     plan: free
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
+    healthCheckPath: /api/health
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_ORIGINS
-        value: "https://your-app.vercel.app"
+        # Comma-separated list. Replace with your Vercel domain after deploy.
+        value: "*"
+      - key: GOOGLE_CLIENT_ID
+        # Paste your Google OAuth Client ID here (Web application type)
+        # e.g. 1234567890-abc.apps.googleusercontent.com
+        value: ""
     disk:
       name: resolva-data
       mountPath: /app/backend/data
