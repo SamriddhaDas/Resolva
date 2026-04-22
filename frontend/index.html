@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Resolva — Modern Complaint Management</title>
+<meta name="description" content="Resolva is a modern complaint management platform: file issues, track resolution, and let smart prioritization put what matters first." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230ea5e9'/%3E%3Cpath d='M9 22V10l6 6 8-8v14' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:    { 950:'#0b1220', 900:'#0f172a', 800:'#1e293b' },
+          brand:  { 50:'#ecfeff', 100:'#cffafe', 300:'#67e8f9', 500:'#06b6d4', 600:'#0891b2', 700:'#0e7490' },
+          accent: { 400:'#a78bfa', 500:'#8b5cf6', 600:'#7c3aed' },
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"','ui-sans-serif','system-ui'],
+          sans:    ['Inter','ui-sans-serif','system-ui'],
+        },
+        boxShadow: {
+          glow: '0 10px 40px -10px rgba(6,182,212,.55)',
+        },
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="font-sans bg-ink-950 text-slate-100 antialiased">
+
+<!-- nav -->
+<header class="fixed inset-x-0 top-0 z-40 backdrop-blur bg-ink-950/70 border-b border-white/5">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2 font-display font-semibold text-lg">
+      <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-accent-500 grid place-items-center shadow-glow">
+        <svg viewBox="0 0 24 24" class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 18V8l6 5 8-7v12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      Resolva
+    </a>
+    <nav class="hidden sm:flex items-center gap-8 text-sm text-slate-300">
+      <a href="#features" class="hover:text-white">Features</a>
+      <a href="#how" class="hover:text-white">How it works</a>
+      <a href="#stack" class="hover:text-white">Stack</a>
+    </nav>
+    <div class="flex items-center gap-2">
+      <a href="/login.html"    class="text-sm px-3 py-1.5 rounded-lg text-slate-300 hover:text-white">Sign in</a>
+      <a href="/register.html" class="text-sm px-3 py-1.5 rounded-lg bg-white text-ink-900 font-medium hover:bg-slate-200">Get started</a>
+    </div>
+  </div>
+</header>
+
+<!-- hero -->
+<section class="relative pt-36 pb-24 overflow-hidden">
+  <div class="absolute inset-0 -z-10">
+    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-brand-500/10 blur-3xl"></div>
+    <div class="absolute top-40 right-0 w-[500px] h-[500px] rounded-full bg-accent-500/10 blur-3xl"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.06)_1px,transparent_0)] [background-size:24px_24px]"></div>
+  </div>
+  <div class="max-w-5xl mx-auto px-6 text-center">
+    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/10 text-brand-300">
+      <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+      Smart prioritization powered by a native C++ engine
+    </span>
+    <h1 class="mt-6 font-display text-5xl sm:text-7xl font-semibold leading-[1.05] tracking-tight">
+      Complaints,<br/>
+      <span class="bg-gradient-to-r from-brand-300 via-brand-500 to-accent-500 bg-clip-text text-transparent">resolved with intent.</span>
+    </h1>
+    <p class="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
+      Resolva turns scattered issues into a clean, prioritized workflow. File a complaint in seconds, watch it get classified automatically, and track every step until it's resolved.
+    </p>
+    <div class="mt-10 flex items-center justify-center gap-3">
+      <a href="/register.html" class="px-5 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-accent-500 text-white font-medium shadow-glow hover:scale-[1.02] transition">
+        File your first complaint →
+      </a>
+      <a href="/login.html" class="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-slate-200">
+        I already have an account
+      </a>
+    </div>
+
+    <!-- mock card -->
+    <div class="mt-16 mx-auto max-w-3xl rounded-2xl border border-white/10 bg-gradient-to-b from-white/[.04] to-white/[.01] p-1.5 shadow-2xl">
+      <div class="rounded-xl bg-ink-900/80 p-5 text-left">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-4">
+          <span>Live ticket • #CMP-1042</span>
+          <span class="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">critical</span>
+        </div>
+        <p class="font-medium">Water leak in Block C — urgent, electrical hazard</p>
+        <p class="text-sm text-slate-400 mt-1">Submitted by jordan@acme.io · 2 min ago · Auto-classified by C++ engine</p>
+        <div class="mt-4 flex gap-2 text-xs">
+          <span class="px-2 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">pending</span>
+          <span class="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300">infrastructure</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- features -->
+<section id="features" class="py-24 border-t border-white/5">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="font-display text-3xl sm:text-4xl font-semibold tracking-tight">Built for the people who actually fix things.</h2>
+    <p class="mt-3 text-slate-400 max-w-2xl">Everything you need to capture, prioritize and resolve issues — without bloated enterprise overhead.</p>
+
+    <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-brand-500/15 text-brand-300 grid place-items-center">⚡</div>
+        <h3 class="mt-4 font-semibold">Auto-prioritization</h3>
+        <p class="mt-2 text-sm text-slate-400">A C++ classifier scores each complaint and assigns low → critical priority instantly.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-accent-500/15 text-accent-400 grid place-items-center">🛡</div>
+        <h3 class="mt-4 font-semibold">Secure by default</h3>
+        <p class="mt-2 text-sm text-slate-400">Scrypt password hashing, JWT sessions, role-based admin access. No SQL injection vectors.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/15 text-emerald-300 grid place-items-center">📊</div>
+        <h3 class="mt-4 font-semibold">Live dashboard</h3>
+        <p class="mt-2 text-sm text-slate-400">See open, in-progress, and resolved counts update in real time.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-rose-500/15 text-rose-300 grid place-items-center">🎯</div>
+        <h3 class="mt-4 font-semibold">Categorized intake</h3>
+        <p class="mt-2 text-sm text-slate-400">Group complaints by category to spot patterns before they become crises.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-sky-500/15 text-sky-300 grid place-items-center">🔁</div>
+        <h3 class="mt-4 font-semibold">Status workflow</h3>
+        <p class="mt-2 text-sm text-slate-400">Pending → in progress → resolved/rejected, with a full updated timestamp trail.</p>
+      </div>
+      <div class="p-6 rounded-2xl bg-white/[.03] border border-white/10 hover:border-brand-500/40 transition">
+        <div class="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-300 grid place-items-center">⌘</div>
+        <h3 class="mt-4 font-semibold">Polyglot stack</h3>
+        <p class="mt-2 text-sm text-slate-400">Python · Node · C++ · Tailwind — each language doing what it's actually good at.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- how it works -->
+<section id="how" class="py-24 border-t border-white/5 bg-gradient-to-b from-transparent to-ink-900/40">
+  <div class="max-w-5xl mx-auto px-6">
+    <h2 class="font-display text-3xl sm:text-4xl font-semibold tracking-tight">From frustration to fixed in three steps.</h2>
+    <div class="mt-12 grid md:grid-cols-3 gap-6">
+      <div class="relative p-6 rounded-2xl bg-ink-900 border border-white/10">
+        <div class="text-5xl font-display font-semibold text-brand-500/30">01</div>
+        <h3 class="mt-2 font-semibold">File the complaint</h3>
+        <p class="mt-2 text-sm text-slate-400">A clean form with title, category and a rich description. Done in under a minute.</p>
+      </div>
+      <div class="relative p-6 rounded-2xl bg-ink-900 border border-white/10">
+        <div class="text-5xl font-display font-semibold text-accent-500/40">02</div>
+        <h3 class="mt-2 font-semibold">Auto-classified</h3>
+        <p class="mt-2 text-sm text-slate-400">The C++ engine reads the text and tags severity in milliseconds.</p>
+      </div>
+      <div class="relative p-6 rounded-2xl bg-ink-900 border border-white/10">
+        <div class="text-5xl font-display font-semibold text-emerald-400/30">03</div>
+        <h3 class="mt-2 font-semibold">Resolved & tracked</h3>
+        <p class="mt-2 text-sm text-slate-400">Admins triage from a single dashboard. You get status updates as it moves.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- stack -->
+<section id="stack" class="py-24 border-t border-white/5">
+  <div class="max-w-5xl mx-auto px-6 text-center">
+    <h2 class="font-display text-3xl sm:text-4xl font-semibold tracking-tight">A focused, modern stack.</h2>
+    <p class="mt-3 text-slate-400">Backend in Python, native classifier in C++, frontend in Tailwind + JS, served via Node.</p>
+    <div class="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="p-5 rounded-xl border border-white/10 bg-white/[.02]"><p class="font-display text-xl">Python</p><p class="text-xs text-slate-500 mt-1">FastAPI · SQLite · JWT</p></div>
+      <div class="p-5 rounded-xl border border-white/10 bg-white/[.02]"><p class="font-display text-xl">C++</p><p class="text-xs text-slate-500 mt-1">Priority engine</p></div>
+      <div class="p-5 rounded-xl border border-white/10 bg-white/[.02]"><p class="font-display text-xl">Tailwind</p><p class="text-xs text-slate-500 mt-1">UI design system</p></div>
+      <div class="p-5 rounded-xl border border-white/10 bg-white/[.02]"><p class="font-display text-xl">Node.js</p><p class="text-xs text-slate-500 mt-1">Static + proxy</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="py-10 border-t border-white/5 text-center text-sm text-slate-500">
+  © <span id="year"></span> Resolva — Complaint Management, redesigned.
+</footer>
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="/js/auth.js"></script>
+</body>
+</html>
