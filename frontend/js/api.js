@@ -1,8 +1,15 @@
 // Tiny fetch wrapper. Adds JWT and parses JSON errors uniformly.
+// Configure backend URL by setting window.RESOLVA_API_BASE in config.js
+// or leave blank to call same-origin (useful for local dev with the Node proxy).
 window.api = (() => {
+  const BASE = (window.RESOLVA_API_BASE || '').replace(/\/$/, '');
   function token() { return localStorage.getItem('resolva_token'); }
+  function url(path) {
+    if (/^https?:\/\//.test(path)) return path;
+    return BASE + path;
+  }
   async function request(method, path, body) {
-    const res = await fetch(path, {
+    const res = await fetch(url(path), {
       method,
       headers: {
         'Content-Type': 'application/json',
