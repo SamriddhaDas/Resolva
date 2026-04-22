@@ -1,38 +1,39 @@
 """
-Complaint Management System — Python FastAPI backend.
+Resolva — Complaint Management System (Python FastAPI backend).
 
-Run:
+Run locally:
     pip install -r requirements.txt
-    uvicorn main:app --reload --port 8000
+    uvicorn backend.main:app --reload --port 8000
 """
 import os
 import sqlite3
 import subprocess
 import secrets
 import hashlib
+import urllib.request
+import json as _json
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 
 # --------------------------------------------------------------------------
-# Config
+# Config (env-driven)
 # --------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "complaints.db")))
-FRONTEND_DIR = BASE_DIR.parent / "frontend"
 CLASSIFIER_BIN = Path(os.getenv("CLASSIFIER_BIN", str(BASE_DIR.parent / "native" / "classifier")))
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-please-1234567890")
+SECRET_KEY = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "change-me-in-production-please-1234567890"
 ALGO = "HS256"
 TOKEN_TTL_HOURS = 24
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
 security = HTTPBearer(auto_error=False)
 
@@ -42,6 +43,7 @@ security = HTTPBearer(auto_error=False)
 # --------------------------------------------------------------------------
 @contextmanager
 def db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -54,12 +56,15 @@ def db():
 
 def init_db():
     with db() as c:
+        # password_hash NULLABLE (Google-only users have no password)
         c.executescript("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
+            password_hash TEXT,
+            google_sub TEXT UNIQUE,
+            avatar_url TEXT,
             role TEXT NOT NULL DEFAULT 'user',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -76,7 +81,13 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         );
         """)
-        # Seed an admin if none
+        # Lightweight migrations for older DBs
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+        if "google_sub" not in cols:
+            c.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+        if "avatar_url" not in cols:
+            c.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
+        # Seed admin
         cur = c.execute("SELECT COUNT(*) AS n FROM users WHERE role='admin'")
         if cur.fetchone()["n"] == 0:
             c.execute(
@@ -94,7 +105,9 @@ def hash_password(pw: str) -> str:
     return f"{salt}${digest}"
 
 
-def verify_password(pw: str, stored: str) -> bool:
+def verify_password(pw: str, stored: Optional[str]) -> bool:
+    if not stored:
+        return False
     try:
         salt, digest = stored.split("$", 1)
         check = hashlib.scrypt(pw.encode(), salt=salt.encode(), n=2**14, r=8, p=1, dklen=32).hex()
@@ -133,19 +146,59 @@ def require_admin(user=Depends(current_user)):
 
 
 # --------------------------------------------------------------------------
+# Google ID-token verification (no extra deps — fetches Google's JWKS)
+# --------------------------------------------------------------------------
+_GOOGLE_CERTS_CACHE = {"ts": 0, "jwks": None}
+
+def _google_jwks():
+    now = datetime.utcnow().timestamp()
+    if _GOOGLE_CERTS_CACHE["jwks"] and (now - _GOOGLE_CERTS_CACHE["ts"] < 3600):
+        return _GOOGLE_CERTS_CACHE["jwks"]
+    with urllib.request.urlopen("https://www.googleapis.com/oauth2/v3/certs", timeout=5) as resp:
+        data = _json.loads(resp.read().decode())
+    _GOOGLE_CERTS_CACHE["jwks"] = data
+    _GOOGLE_CERTS_CACHE["ts"] = now
+    return data
+
+
+def verify_google_id_token(id_token: str) -> dict:
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(503, "Google sign-in not configured on server (set GOOGLE_CLIENT_ID).")
+    try:
+        unverified_header = jwt.get_unverified_header(id_token)
+        kid = unverified_header.get("kid")
+        jwks = _google_jwks()
+        key_data = next((k for k in jwks["keys"] if k["kid"] == kid), None)
+        if not key_data:
+            raise HTTPException(401, "Google key not found (try again).")
+        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(_json.dumps(key_data))
+        payload = jwt.decode(
+            id_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=GOOGLE_CLIENT_ID,
+            options={"require": ["exp", "iat", "sub", "email"]},
+        )
+        if payload.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+            raise HTTPException(401, "Invalid Google issuer.")
+        if not payload.get("email_verified", False):
+            raise HTTPException(401, "Google email not verified.")
+        return payload
+    except HTTPException:
+        raise
+    except jwt.PyJWTError as e:
+        raise HTTPException(401, f"Invalid Google token: {e}")
+
+
+# --------------------------------------------------------------------------
 # C++ classifier integration
 # --------------------------------------------------------------------------
 def classify_priority(text: str) -> str:
-    """Call the native C++ classifier to compute priority. Falls back gracefully."""
     if not CLASSIFIER_BIN.exists():
         return "medium"
     try:
         res = subprocess.run(
-            [str(CLASSIFIER_BIN)],
-            input=text,
-            capture_output=True,
-            text=True,
-            timeout=3,
+            [str(CLASSIFIER_BIN)], input=text, capture_output=True, text=True, timeout=3,
         )
         out = res.stdout.strip().lower()
         if out in {"low", "medium", "high", "critical"}:
@@ -169,6 +222,10 @@ class LoginIn(BaseModel):
     password: str
 
 
+class GoogleIn(BaseModel):
+    credential: str  # Google ID token from GIS
+
+
 class ComplaintIn(BaseModel):
     title: str = Field(min_length=3, max_length=120)
     category: str = Field(min_length=2, max_length=40)
@@ -182,19 +239,17 @@ class StatusIn(BaseModel):
 # --------------------------------------------------------------------------
 # App
 # --------------------------------------------------------------------------
-app = FastAPI(title="Complaint Management System", version="2.0.0")
-_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+app = FastAPI(title="Resolva — Complaint Management System", version="2.1.0")
+
+_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+_origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=_origins or ["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/api/health")
-def _health():
-    return {"status": "ok"}
 
 
 @app.on_event("startup")
@@ -202,35 +257,89 @@ def _startup():
     init_db()
 
 
-# ---- Auth ----
+@app.get("/api/health")
+def _health():
+    return {
+        "status": "ok",
+        "google_enabled": bool(GOOGLE_CLIENT_ID),
+        "time": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/config.js")
+def runtime_config():
+    """Serves runtime config to the frontend, no rebuild needed."""
+    body = (
+        "window.RESOLVA_API_BASE = window.RESOLVA_API_BASE || location.origin;\n"
+        f"window.GOOGLE_CLIENT_ID = {_json.dumps(GOOGLE_CLIENT_ID)};\n"
+    )
+    return Response(content=body, media_type="application/javascript")
+
+
+# ---- Auth: email/password ----
 @app.post("/api/register")
 def register(body: RegisterIn):
     with db() as c:
         if c.execute("SELECT 1 FROM users WHERE email=?", (body.email,)).fetchone():
-            raise HTTPException(409, "Email already registered")
+            raise HTTPException(409, "Email already registered. Please sign in instead.")
         cur = c.execute(
             "INSERT INTO users(name,email,password_hash) VALUES (?,?,?)",
             (body.name, body.email, hash_password(body.password)),
         )
         uid = cur.lastrowid
-    return {"token": make_token(uid, "user"), "user": {"id": uid, "name": body.name, "email": body.email, "role": "user"}}
+    return {"token": make_token(uid, "user"),
+            "user": {"id": uid, "name": body.name, "email": body.email, "role": "user"}}
 
 
 @app.post("/api/login")
 def login(body: LoginIn):
     with db() as c:
         row = c.execute("SELECT * FROM users WHERE email=?", (body.email,)).fetchone()
-    if not row or not verify_password(body.password, row["password_hash"]):
-        raise HTTPException(401, "Invalid credentials")
-    return {
-        "token": make_token(row["id"], row["role"]),
-        "user": {"id": row["id"], "name": row["name"], "email": row["email"], "role": row["role"]},
-    }
+    if not row:
+        raise HTTPException(401, "No account found with that email.")
+    if not row["password_hash"]:
+        raise HTTPException(401, "This account uses Google sign-in. Click 'Continue with Google'.")
+    if not verify_password(body.password, row["password_hash"]):
+        raise HTTPException(401, "Incorrect password.")
+    return {"token": make_token(row["id"], row["role"]),
+            "user": {"id": row["id"], "name": row["name"], "email": row["email"],
+                     "role": row["role"], "avatar_url": row["avatar_url"]}}
+
+
+# ---- Auth: Google ----
+@app.post("/api/google")
+def google_auth(body: GoogleIn):
+    payload = verify_google_id_token(body.credential)
+    sub = payload["sub"]
+    email = payload["email"].lower()
+    name = payload.get("name") or email.split("@")[0]
+    picture = payload.get("picture")
+
+    with db() as c:
+        row = c.execute(
+            "SELECT * FROM users WHERE google_sub=? OR email=?", (sub, email)
+        ).fetchone()
+        if row:
+            # Link google_sub if missing, refresh avatar/name
+            c.execute(
+                "UPDATE users SET google_sub=?, avatar_url=COALESCE(?,avatar_url), name=COALESCE(NULLIF(?, ''), name) WHERE id=?",
+                (sub, picture, name, row["id"]),
+            )
+            uid, role = row["id"], row["role"]
+        else:
+            cur = c.execute(
+                "INSERT INTO users(name,email,google_sub,avatar_url,role) VALUES (?,?,?,?,?)",
+                (name, email, sub, picture, "user"),
+            )
+            uid, role = cur.lastrowid, "user"
+        u = c.execute("SELECT id,name,email,role,avatar_url FROM users WHERE id=?", (uid,)).fetchone()
+    return {"token": make_token(uid, role), "user": dict(u)}
 
 
 @app.get("/api/me")
 def me(user=Depends(current_user)):
-    return {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
+    return {"id": user["id"], "name": user["name"], "email": user["email"],
+            "role": user["role"], "avatar_url": user.get("avatar_url")}
 
 
 # ---- Complaints ----
@@ -288,34 +397,6 @@ def delete_complaint(cid: int, user=Depends(current_user)):
         if not row:
             raise HTTPException(404, "Not found")
         if user["role"] != "admin" and row["user_id"] != user["id"]:
-            raise HTTPException(403, "Forbidden")
+            raise HTTPException(403, "Not allowed")
         c.execute("DELETE FROM complaints WHERE id=?", (cid,))
     return {"ok": True}
-
-
-@app.get("/api/stats")
-def stats(user=Depends(current_user)):
-    with db() as c:
-        scope = "" if user["role"] == "admin" else f"WHERE user_id={user['id']}"
-        total = c.execute(f"SELECT COUNT(*) n FROM complaints {scope}").fetchone()["n"]
-        by_status = {r["status"]: r["n"] for r in c.execute(
-            f"SELECT status, COUNT(*) n FROM complaints {scope} GROUP BY status")}
-        by_priority = {r["priority"]: r["n"] for r in c.execute(
-            f"SELECT priority, COUNT(*) n FROM complaints {scope} GROUP BY priority")}
-    return {"total": total, "by_status": by_status, "by_priority": by_priority}
-
-
-# ---- Static frontend ----
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-
-    @app.get("/")
-    def root():
-        return FileResponse(FRONTEND_DIR / "index.html")
-
-    @app.get("/{page}.html")
-    def page(page: str):
-        f = FRONTEND_DIR / f"{page}.html"
-        if f.exists():
-            return FileResponse(f)
-        raise HTTPException(404)
