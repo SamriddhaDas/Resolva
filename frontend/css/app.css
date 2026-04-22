@@ -1,1 +1,15 @@
+/* Subtle global polish on top of Tailwind */
+html { color-scheme: dark; }
+body { -webkit-font-smoothing: antialiased; }
 
+/* nicer scrollbar in dark UI */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.16); }
+
+/* selection */
+::selection { background: rgba(6,182,212,.35); color: white; }
+
+/* simple fade-in */
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+.fade-up { animation: fadeUp .35s ease both; }
