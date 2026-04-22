@@ -33,31 +33,6 @@ The original schema (users + complaints) is preserved and extended (categories, 
     └── package.json
 ```
 
-## Quick start
-
-### 1) Build the C++ classifier (optional — backend falls back if missing)
-```bash
-cd native
-make            # produces ./classifier
-cd ..
-```
-
-### 2) Run the Python backend
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-The backend serves the API **and** the frontend at <http://localhost:8000>.
-
-### 3) (Optional) Run the Node dev server
-Useful if you want to host the frontend separately.
-```bash
-cd node-server
-node server.js          # http://localhost:3000, proxies /api/* → http://localhost:8000
-```
-
 ## Demo account
 An admin user is auto-seeded on first run:
 - **Email:** `admin@demo.io`
