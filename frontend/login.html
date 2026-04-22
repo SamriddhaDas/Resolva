@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Sign in · Resolva</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/css/app.css"/>
 </head>
 <body class="min-h-screen bg-ink-950 text-slate-100 font-sans antialiased grid lg:grid-cols-2">
 
-<!-- left: hero panel -->
 <aside class="hidden lg:flex relative overflow-hidden p-12 flex-col justify-between bg-gradient-to-br from-brand-700 via-ink-900 to-accent-600">
   <div class="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.08)_1px,transparent_0)] [background-size:22px_22px] opacity-40"></div>
   <a href="/" class="relative font-display text-xl font-semibold flex items-center gap-2">
@@ -23,14 +23,20 @@
   <p class="relative text-xs text-slate-300/70">Backed by a native C++ priority engine. Built for clarity.</p>
 </aside>
 
-<!-- right: form -->
 <main class="flex items-center justify-center p-8">
   <div class="w-full max-w-sm">
     <a href="/" class="lg:hidden font-display text-xl font-semibold">Resolva</a>
     <h1 class="mt-8 font-display text-3xl font-semibold tracking-tight">Welcome back</h1>
     <p class="mt-2 text-sm text-slate-400">Sign in to manage your complaints.</p>
 
-    <form id="loginForm" class="mt-8 space-y-4">
+    <!-- Google button mount point -->
+    <div id="gbtn" class="mt-6 flex justify-center min-h-[44px]"></div>
+
+    <div class="my-6 flex items-center gap-3 text-xs text-slate-500">
+      <div class="h-px flex-1 bg-white/10"></div> OR <div class="h-px flex-1 bg-white/10"></div>
+    </div>
+
+    <form id="loginForm" class="space-y-4">
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
         <input name="email" type="email" required autocomplete="email"
@@ -60,8 +66,10 @@
 <script>
   tailwind.config = { theme: { extend: { colors: { ink:{950:'#0b1220',900:'#0f172a',800:'#1e293b'}, brand:{300:'#67e8f9',500:'#06b6d4',600:'#0891b2',700:'#0e7490'}, accent:{500:'#8b5cf6',600:'#7c3aed'} }, fontFamily:{display:['Space Grotesk'], sans:['Inter']}, boxShadow:{glow:'0 10px 40px -10px rgba(6,182,212,.55)'} } } }
 </script>
+<script src="/js/config.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/auth.js"></script>
+<script src="/js/google.js"></script>
 <script>
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
