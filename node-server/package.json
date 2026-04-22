@@ -1,0 +1,11 @@
+{
+  "name": "complaint-system-frontend-server",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Static + proxy dev server for the Complaint Management System frontend.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
