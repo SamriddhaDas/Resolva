@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Create account · Resolva</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/css/app.css"/>
 </head>
@@ -26,13 +25,7 @@
     <h1 class="font-display text-3xl font-semibold tracking-tight">Create your account</h1>
     <p class="mt-2 text-sm text-slate-400">Takes about 20 seconds.</p>
 
-    <div id="gbtn" class="mt-6 flex justify-center min-h-[44px]"></div>
-
-    <div class="my-6 flex items-center gap-3 text-xs text-slate-500">
-      <div class="h-px flex-1 bg-white/10"></div> OR <div class="h-px flex-1 bg-white/10"></div>
-    </div>
-
-    <form id="regForm" class="space-y-4">
+    <form id="regForm" class="space-y-4 mt-8">
       <div>
         <label class="block text-xs font-medium text-slate-400 mb-1.5">Full name</label>
         <input name="name" required minlength="2"
@@ -66,7 +59,6 @@
 <script src="/js/config.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/auth.js"></script>
-<script src="/js/google.js"></script>
 <script>
   document.getElementById('regForm').addEventListener('submit', async (e) => {
     e.preventDefault();
