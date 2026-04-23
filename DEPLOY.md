@@ -96,7 +96,7 @@ git push -u origin main
 - [ ] `/login.html` shows the Google button
 - [ ] Click Google button → pick account → redirected to `/dashboard.html`
 - [ ] Email/password register → instant login → dashboard
-- [ ] Email/password login with `admin@demo.io` / `admin123` → admin view
+- [ ] Create a complaint and confirm it appears immediately in the complaints list after refresh
 
 ---
 
@@ -109,7 +109,7 @@ You forgot step 4.1. Open `frontend/js/config.js`, set `RESOLVA_API_BASE` to you
 Render free service is asleep. Wait 30–50 s, then retry. Or visit `/api/health` once to wake it.
 
 **"Invalid Google token" / "Google sign-in not configured"**
-The backend doesn't have `GOOGLE_CLIENT_ID` set. Add it on Render → restart.
+The backend doesn't have `GOOGLE_CLIENT_ID` set. Add it on Render → restart. If the Google warning still shows on the frontend, confirm `frontend/js/config.js` points to the correct backend URL so `/api/config.js` can load the runtime Google client ID.
 
 **"popup_blocked_by_browser" or button doesn't appear**
 Your Vercel domain isn't in **Authorized JavaScript origins** on Google Cloud Console. Add it and wait ~1 min.

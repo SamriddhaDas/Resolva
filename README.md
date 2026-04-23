@@ -1,4 +1,4 @@
-# Resolva — Complaint Management System
+# Resolva — Complaint Management System (v2)
 
 A modern rewrite of a classic PHP/MySQL complaint system using a focused, polyglot stack:
 
@@ -58,12 +58,10 @@ cd node-server
 node server.js          # http://localhost:3000, proxies /api/* → http://localhost:8000
 ```
 
-## Demo account
-An admin user is auto-seeded on first run:
-- **Email:** `admin@demo.io`
-- **Password:** `admin123`
-
-Change this immediately in any real deployment.
+## Accounts and persistence
+- Any visitor can create a normal account with email/password.
+- Google sign-in works once `GOOGLE_CLIENT_ID` is configured on the backend.
+- User accounts and complaint records are stored in the SQLite database so returning users can sign in again without re-registering.
 
 ## Security notes (vs. the original PHP version)
 - ❌ Plain-text passwords → ✅ scrypt hashing with per-user salt
