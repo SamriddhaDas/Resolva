@@ -10,7 +10,6 @@ import sqlite3
 import subprocess
 import secrets
 import hashlib
-import urllib.request
 import json as _json
 from collections import Counter
 from datetime import datetime, timedelta
@@ -33,8 +32,6 @@ CLASSIFIER_BIN = Path(os.getenv("CLASSIFIER_BIN", str(BASE_DIR.parent / "native"
 SECRET_KEY = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "change-me-in-production-please-1234567890"
 ALGO = "HS256"
 TOKEN_TTL_HOURS = 24
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
 security = HTTPBearer(auto_error=False)
 
@@ -63,7 +60,6 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT,
-            google_sub TEXT UNIQUE,
             avatar_url TEXT,
             role TEXT NOT NULL DEFAULT 'user',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -81,10 +77,7 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         );
         """)
-        # Lightweight migrations for older DBs
         cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
-        if "google_sub" not in cols:
-            c.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
         if "avatar_url" not in cols:
             c.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
         c.execute("DELETE FROM users WHERE email=? AND role='admin'", ("admin@demo.io",))
@@ -140,51 +133,6 @@ def require_admin(user=Depends(current_user)):
 
 
 # --------------------------------------------------------------------------
-# Google ID-token verification (no extra deps — fetches Google's JWKS)
-# --------------------------------------------------------------------------
-_GOOGLE_CERTS_CACHE = {"ts": 0, "jwks": None}
-
-def _google_jwks():
-    now = datetime.utcnow().timestamp()
-    if _GOOGLE_CERTS_CACHE["jwks"] and (now - _GOOGLE_CERTS_CACHE["ts"] < 3600):
-        return _GOOGLE_CERTS_CACHE["jwks"]
-    with urllib.request.urlopen("https://www.googleapis.com/oauth2/v3/certs", timeout=5) as resp:
-        data = _json.loads(resp.read().decode())
-    _GOOGLE_CERTS_CACHE["jwks"] = data
-    _GOOGLE_CERTS_CACHE["ts"] = now
-    return data
-
-
-def verify_google_id_token(id_token: str) -> dict:
-    if not GOOGLE_CLIENT_ID:
-        raise HTTPException(503, "Google sign-in not configured on server (set GOOGLE_CLIENT_ID).")
-    try:
-        unverified_header = jwt.get_unverified_header(id_token)
-        kid = unverified_header.get("kid")
-        jwks = _google_jwks()
-        key_data = next((k for k in jwks["keys"] if k["kid"] == kid), None)
-        if not key_data:
-            raise HTTPException(401, "Google key not found (try again).")
-        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(_json.dumps(key_data))
-        payload = jwt.decode(
-            id_token,
-            public_key,
-            algorithms=["RS256"],
-            audience=GOOGLE_CLIENT_ID,
-            options={"require": ["exp", "iat", "sub", "email"]},
-        )
-        if payload.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
-            raise HTTPException(401, "Invalid Google issuer.")
-        if not payload.get("email_verified", False):
-            raise HTTPException(401, "Google email not verified.")
-        return payload
-    except HTTPException:
-        raise
-    except jwt.PyJWTError as e:
-        raise HTTPException(401, f"Invalid Google token: {e}")
-
-
-# --------------------------------------------------------------------------
 # C++ classifier integration
 # --------------------------------------------------------------------------
 def classify_priority(text: str) -> str:
@@ -216,10 +164,6 @@ class LoginIn(BaseModel):
     password: str
 
 
-class GoogleIn(BaseModel):
-    credential: str  # Google ID token from GIS
-
-
 class ComplaintIn(BaseModel):
     title: str = Field(min_length=3, max_length=120)
     category: str = Field(min_length=2, max_length=40)
@@ -233,7 +177,7 @@ class StatusIn(BaseModel):
 # --------------------------------------------------------------------------
 # App
 # --------------------------------------------------------------------------
-app = FastAPI(title="Resolva — Complaint Management System", version="2.1.0")
+app = FastAPI(title="Resolva — Complaint Management System", version="3.0.0")
 
 _origins_env = os.getenv("ALLOWED_ORIGINS", "*")
 _origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
@@ -253,20 +197,12 @@ def _startup():
 
 @app.get("/api/health")
 def _health():
-    return {
-        "status": "ok",
-        "google_enabled": bool(GOOGLE_CLIENT_ID),
-        "time": datetime.utcnow().isoformat(),
-    }
+    return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
 
 @app.get("/api/config.js")
 def runtime_config():
-    """Serves runtime config to the frontend, no rebuild needed."""
-    body = (
-        "window.RESOLVA_API_BASE = window.RESOLVA_API_BASE || location.origin;\n"
-        f"window.GOOGLE_CLIENT_ID = {_json.dumps(GOOGLE_CLIENT_ID)};\n"
-    )
+    body = "window.RESOLVA_API_BASE = window.RESOLVA_API_BASE || location.origin;\n"
     return Response(content=body, media_type="application/javascript")
 
 
@@ -294,43 +230,11 @@ def login(body: LoginIn):
         row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
     if not row:
         raise HTTPException(401, "No account found with that email.")
-    if not row["password_hash"]:
-        raise HTTPException(401, "This account uses Google sign-in. Click 'Continue with Google'.")
     if not verify_password(body.password, row["password_hash"]):
         raise HTTPException(401, "Incorrect password.")
     return {"token": make_token(row["id"], row["role"]),
             "user": {"id": row["id"], "name": row["name"], "email": row["email"],
                      "role": row["role"], "avatar_url": row["avatar_url"]}}
-
-
-# ---- Auth: Google ----
-@app.post("/api/google")
-def google_auth(body: GoogleIn):
-    payload = verify_google_id_token(body.credential)
-    sub = payload["sub"]
-    email = payload["email"].lower()
-    name = (payload.get("name") or email.split("@")[0]).strip()
-    picture = payload.get("picture")
-
-    with db() as c:
-        row = c.execute(
-            "SELECT * FROM users WHERE google_sub=? OR email=?", (sub, email)
-        ).fetchone()
-        if row:
-            # Link google_sub if missing, refresh avatar/name
-            c.execute(
-                "UPDATE users SET google_sub=?, avatar_url=COALESCE(?,avatar_url), name=COALESCE(NULLIF(?, ''), name) WHERE id=?",
-                (sub, picture, name, row["id"]),
-            )
-            uid, role = row["id"], row["role"]
-        else:
-            cur = c.execute(
-                "INSERT INTO users(name,email,google_sub,avatar_url,role) VALUES (?,?,?,?,?)",
-                (name, email, sub, picture, "user"),
-            )
-            uid, role = cur.lastrowid, "user"
-        u = c.execute("SELECT id,name,email,role,avatar_url FROM users WHERE id=?", (uid,)).fetchone()
-    return {"token": make_token(uid, role), "user": dict(u)}
 
 
 @app.get("/api/me")
