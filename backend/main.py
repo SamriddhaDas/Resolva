@@ -12,6 +12,7 @@ import secrets
 import hashlib
 import urllib.request
 import json as _json
+from collections import Counter
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 from pathlib import Path
@@ -27,7 +28,7 @@ from pydantic import BaseModel, EmailStr, Field
 # Config (env-driven)
 # --------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "complaints.db")))
+DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "data" / "complaints.db")))
 CLASSIFIER_BIN = Path(os.getenv("CLASSIFIER_BIN", str(BASE_DIR.parent / "native" / "classifier")))
 SECRET_KEY = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or "change-me-in-production-please-1234567890"
 ALGO = "HS256"
@@ -56,7 +57,6 @@ def db():
 
 def init_db():
     with db() as c:
-        # password_hash NULLABLE (Google-only users have no password)
         c.executescript("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,13 +87,7 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
         if "avatar_url" not in cols:
             c.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
-        # Seed admin
-        cur = c.execute("SELECT COUNT(*) AS n FROM users WHERE role='admin'")
-        if cur.fetchone()["n"] == 0:
-            c.execute(
-                "INSERT INTO users(name,email,password_hash,role) VALUES (?,?,?,?)",
-                ("Admin", "admin@demo.io", hash_password("admin123"), "admin"),
-            )
+        c.execute("DELETE FROM users WHERE email=? AND role='admin'", ("admin@demo.io",))
 
 
 # --------------------------------------------------------------------------
@@ -279,22 +273,25 @@ def runtime_config():
 # ---- Auth: email/password ----
 @app.post("/api/register")
 def register(body: RegisterIn):
+    name = body.name.strip()
+    email = body.email.strip().lower()
     with db() as c:
-        if c.execute("SELECT 1 FROM users WHERE email=?", (body.email,)).fetchone():
+        if c.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone():
             raise HTTPException(409, "Email already registered. Please sign in instead.")
         cur = c.execute(
             "INSERT INTO users(name,email,password_hash) VALUES (?,?,?)",
-            (body.name, body.email, hash_password(body.password)),
+            (name, email, hash_password(body.password)),
         )
         uid = cur.lastrowid
     return {"token": make_token(uid, "user"),
-            "user": {"id": uid, "name": body.name, "email": body.email, "role": "user"}}
+            "user": {"id": uid, "name": name, "email": email, "role": "user"}}
 
 
 @app.post("/api/login")
 def login(body: LoginIn):
+    email = body.email.strip().lower()
     with db() as c:
-        row = c.execute("SELECT * FROM users WHERE email=?", (body.email,)).fetchone()
+        row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
     if not row:
         raise HTTPException(401, "No account found with that email.")
     if not row["password_hash"]:
@@ -312,7 +309,7 @@ def google_auth(body: GoogleIn):
     payload = verify_google_id_token(body.credential)
     sub = payload["sub"]
     email = payload["email"].lower()
-    name = payload.get("name") or email.split("@")[0]
+    name = (payload.get("name") or email.split("@")[0]).strip()
     picture = payload.get("picture")
 
     with db() as c:
@@ -340,6 +337,36 @@ def google_auth(body: GoogleIn):
 def me(user=Depends(current_user)):
     return {"id": user["id"], "name": user["name"], "email": user["email"],
             "role": user["role"], "avatar_url": user.get("avatar_url")}
+
+
+@app.get("/api/stats")
+def stats(user=Depends(current_user)):
+    with db() as c:
+        if user["role"] == "admin":
+            rows = c.execute("SELECT status, priority FROM complaints").fetchall()
+        else:
+            rows = c.execute(
+                "SELECT status, priority FROM complaints WHERE user_id=?",
+                (user["id"],),
+            ).fetchall()
+
+    statuses = Counter(row["status"] for row in rows)
+    priorities = Counter(row["priority"] for row in rows)
+    return {
+        "total": len(rows),
+        "by_status": {
+            "pending": statuses.get("pending", 0),
+            "in_progress": statuses.get("in_progress", 0),
+            "resolved": statuses.get("resolved", 0),
+            "rejected": statuses.get("rejected", 0),
+        },
+        "by_priority": {
+            "critical": priorities.get("critical", 0),
+            "high": priorities.get("high", 0),
+            "medium": priorities.get("medium", 0),
+            "low": priorities.get("low", 0),
+        },
+    }
 
 
 # ---- Complaints ----
